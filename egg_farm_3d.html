@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Egg Farm 3D</title>
+<style>
+  :root { --ink:#20352a; --cream:#fff8e8; --green:#2d8b45; --gold:#ffc94a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; width:100%; height:100%; overflow:hidden; font-family:system-ui,-apple-system,Segoe UI,sans-serif; background:#bfe7ff; color:var(--ink); }
+  #game { position:fixed; inset:0; }
+  canvas { display:block; width:100%; height:100%; touch-action: manipulation; }
+  .hud { position:fixed; z-index:2; pointer-events:none; inset:0; padding:12px; display:flex; flex-direction:column; justify-content:space-between; gap:10px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .brand,.money,.stat,.panel { background:rgba(255,248,232,.94); border:2px solid rgba(40,78,48,.18); border-radius:16px; box-shadow:0 4px 0 rgba(36,78,45,.12); }
+  .brand { padding:9px 13px; font-weight:900; letter-spacing:.04em; font-size:14px; }
+  .money { padding:8px 12px; text-align:right; min-width:128px; }
+  .money small { display:block; font-size:10px; font-weight:800; opacity:.65; text-transform:uppercase; }
+  .money strong { font-size:21px; color:#247b3a; }
+  .stats { display:flex; gap:7px; justify-content:center; flex-wrap:wrap; }
+  .stat { padding:6px 10px; font-size:12px; font-weight:800; }
+  .bottom { display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end; }
+  .panel { pointer-events:auto; padding:10px; min-width:0; }
+  .panel h3 { margin:0 0 6px; font-size:13px; text-transform:uppercase; letter-spacing:.05em; }
+  .muted { font-size:11px; opacity:.7; margin:0 0 8px; }
+  button { border:0; border-radius:12px; font:inherit; font-weight:850; color:#20352a; background:#f4c64b; padding:10px 9px; box-shadow:0 3px 0 #d29d28; cursor:pointer; touch-action:manipulation; }
+  button:active { transform:translateY(2px); box-shadow:0 1px 0 #d29d28; }
+  button:disabled { opacity:.45; filter:grayscale(.4); cursor:not-allowed; }
+  .actions { display:grid; grid-template-columns:1fr; gap:7px; }
+  .upgrade { display:flex; justify-content:space-between; align-items:center; gap:6px; text-align:left; width:100%; padding:9px; background:#e7f4d7; box-shadow:0 3px 0 #b5d19b; }
+  .upgrade span { display:block; min-width:0; }
+  .upgrade b { font-size:12px; display:block; }
+  .upgrade small { font-size:10px; opacity:.7; }
+  .upgrade em { font-style:normal; font-size:12px; white-space:nowrap; }
+  #toast { position:fixed; z-index:5; top:25%; left:50%; transform:translate(-50%,-10px); background:#20352a; color:white; padding:10px 15px; border-radius:99px; font-weight:800; font-size:13px; opacity:0; transition:.2s; pointer-events:none; white-space:nowrap; }
+  #toast.show { opacity:1; transform:translate(-50%,0); }
+  #hint { position:fixed; z-index:2; top:76px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,.8); border-radius:99px; padding:6px 10px; font-size:11px; font-weight:800; white-space:nowrap; pointer-events:none; }
+  @media (max-width:520px) {
+    .hud { padding:8px; }
+    .brand { font-size:11px; padding:8px 10px; }
+    .money { min-width:105px; padding:7px 10px; }
+    .money strong { font-size:18px; }
+    .bottom { grid-template-columns:1fr 1fr; gap:6px; }
+    .panel { padding:8px; border-radius:13px; }
+    .panel h3 { font-size:11px; }
+    .muted { font-size:10px; margin-bottom:6px; }
+    button { padding:9px 7px; font-size:12px; }
+    .upgrade { padding:8px 7px; }
+    .upgrade b { font-size:11px; }
+    .upgrade small { font-size:9px; }
+    .upgrade em { font-size:10px; }
+    #hint { top:65px; font-size:10px; }
+  }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div class="hud">
+  <div class="top">
+    <div class="brand">🥚 EGG FARM <span style="color:#4d9d52">3D</span></div>
+    <div class="money"><small>Farm cash</small><strong id="cash">$0</strong></div>
+  </div>
+  <div class="stats">
+    <div class="stat">🐔 Chickens: <span id="chickenCount">0</span></div>
+    <div class="stat">🥚 Eggs/sec: <span id="rate">0</span></div>
+    <div class="stat">🚚 Truck level: <span id="truckLevel">1</span></div>
+  </div>
+  <div class="bottom">
+    <section class="panel">
+      <h3>Chicken yard</h3>
+      <p class="muted">Tap to hatch chickens. They make eggs automatically!</p>
+      <div class="actions">
+        <button id="hatchBtn">+ Hatch chicken · $10</button>
+        <button id="collectBtn" style="background:#ffe6a2">Collect egg bonus</button>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>Farm upgrades</h3>
+      <div class="actions">
+        <button class="upgrade" id="coopBtn"><span><b>🛖 Bigger coop</b><small>+1 chicken per hatch</small></span><em id="coopCost">$80</em></button>
+        <button class="upgrade" id="feedBtn"><span><b>🌾 Super feed</b><small>Eggs worth more</small></span><em id="feedCost">$120</em></button>
+        <button class="upgrade" id="truckBtn"><span><b>🚚 Delivery truck</b><small>Faster egg sales</small></span><em id="truckCost">$180</em></button>
+      </div>
+    </section>
+  </div>
+</div>
+<div id="hint">A tiny farm that keeps growing</div>
+<div id="toast"></div>
+<script type="module">
+(async function(){
+  const status = document.getElementById('hint');
+  try {
+    const THREE = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js');
+    startGame(THREE);
+  } catch (err) {
+    status.textContent = 'Could not load 3D engine. Check your internet and open this from a website.';
+    status.style.whiteSpace = 'normal';
+    status.style.maxWidth = '90%';
+    console.error(err);
+  }
+})();
+
+function startGame(THREE) {
+  const root = document.getElementById('game');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#bfe7ff');
+  scene.fog = new THREE.Fog('#bfe7ff', 24, 65);
+
+  const camera = new THREE.OrthographicCamera(-12,12,8,-8,.1,100);
+  camera.position.set(15,18,20);
+  camera.lookAt(0,0,0);
+  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  root.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff,0x6e9c65,2.0));
+  const sun = new THREE.DirectionalLight(0xffffff,2.2);
+  sun.position.set(-8,18,12); sun.castShadow=true;
+  sun.shadow.mapSize.set(1024,1024);
+  sun.shadow.camera.left=-22; sun.shadow.camera.right=22;
+  sun.shadow.camera.top=22; sun.shadow.camera.bottom=-22;
+  scene.add(sun);
+
+  const mat = (color, roughness=1) => new THREE.MeshStandardMaterial({color,roughness, flatShading:true});
+  const grassMat=mat('#73c95b'), darkGrass=mat('#54ad4c'), pathMat=mat('#d8c49a'),
+        white=mat('#fff9e9'), red=mat('#df5948'), roofMat=mat('#e9bd43'),
+        wood=mat('#a96b3d'), dark=mat('#46544a'), gray=mat('#d9e1e4'),
+        wheelMat=mat('#30383a'), eggMat=mat('#fff0ce'), combMat=mat('#e74c3c'),
+        beakMat=mat('#f3a42c'), windowMat=mat('#a9e2f3');
+  const boxGeo = new THREE.BoxGeometry(1,1,1);
+  const sphereGeo = new THREE.SphereGeometry(1,8,6);
+  const coneGeo = new THREE.ConeGeometry(1,1,5);
+  function mesh(geo, material, parent=scene, x=0,y=0,z=0,sx=1,sy=1,sz=1) {
+    const m=new THREE.Mesh(geo,material); m.position.set(x,y,z); m.scale.set(sx,sy,sz);
+    m.castShadow=true; m.receiveShadow=true; parent.add(m); return m;
+  }
+  function cube(parent, material, x,y,z,sx,sy,sz){ return mesh(boxGeo,material,parent,x,y,z,sx,sy,sz); }
+
+  // A broad green farm pad with fixed, isometric camera.
+  cube(scene,grassMat,0,-.38,0,34,.65,27);
+  for(let i=0;i<38;i++){
+    const x=((i*17)%31)-15, z=((i*11)%23)-11;
+    if(Math.abs(x)<4 && z<5 && z>-8) continue;
+    mesh(coneGeo, darkGrass,scene,x,-.01,z,.09,.035,.09).rotation.x=Math.PI;
+  }
+  // Central pale service lane.
+  cube(scene,pathMat,0,-.015,4.4,30,.08,2.3);
+  cube(scene,pathMat,7,-.012,-1.4,2.1,.08,13);
+  // Lane dashes.
+  for(let i=0;i<8;i++) cube(scene,white,7,.04,-6+i*1.5,.12,.025,.7);
+
+  // Fence around the front of the chicken farm.
+  for(let x=-13;x<=13;x+=1.3){
+    cube(scene,white,x,.38,9.8,.12,.75,.12);
+    if(Math.round((x+13)/1.3)%2===0) cube(scene,wood,x,.45,9.8,.18,.12,.18);
+  }
+  cube(scene,white,0,.23,9.8,27,.12,.12);
+  cube(scene,white,0,.55,9.8,27,.12,.12);
+  for(let z=1;z<=9;z+=1.3){
+    cube(scene,white,-13,.38,z,.12,.75,.12);
+    cube(scene,white,13,.38,z,.12,.75,.12);
+  }
+  cube(scene,white,-13,.23,5,.12,.12,9.5);
+  cube(scene,white,-13,.55,5,.12,.12,9.5);
+  cube(scene,white,13,.23,5,.12,.12,9.5);
+  cube(scene,white,13,.55,5,.12,.12,9.5);
+
+  // Low-poly chicken house.
+  const coop = new THREE.Group(); scene.add(coop); coop.position.set(-5,0,-1.7);
+  cube(coop,white,0,1,0,5.2,2,3.7);
+  const roof=mesh(coneGeo,roofMat,coop,0,2.6,0,3.5,2.0,2.8); roof.rotation.z=Math.PI/2;
+  cube(coop,red,0,.42,1.88,1.4,.85,.12);
+  cube(coop,wood,-1.65,1.2,1.9,.85,.7,.08);
+  cube(coop,wood,1.65,1.2,1.9,.85,.7,.08);
+  cube(coop,windowMat,-1.65,1.2,1.96,.58,.46,.04);
+  cube(coop,windowMat,1.65,1.2,1.96,.58,.46,.04);
+  // A second, smaller house unlocks visually as flock grows.
+  const coop2=new THREE.Group(); scene.add(coop2); coop2.position.set(1.4,-.02,-5.4);
+  cube(coop2,white,0,.75,0,3.8,1.5,2.8);
+  const roof2=mesh(coneGeo,roofMat,coop2,0,1.85,0,2.6,1.5,2.15); roof2.rotation.z=Math.PI/2;
+  cube(coop2,red,0,.35,1.42,1,.65,.1);
+
+  // Three silos, each with a rounded-ish low-poly cap.
+  function silo(x,z,scale=1){
+    const g=new THREE.Group(); scene.add(g); g.position.set(x,0,z); g.scale.setScalar(scale);
+    const body=mesh(new THREE.CylinderGeometry(.7,.8,2.6,8),gray,g,0,1.3,0);
+    mesh(new THREE.ConeGeometry(.78,.7,8),white,g,0,2.95,0);
+    cube(g,dark,0,.15,.78,.5,.28,.12);
+  }
+  silo(10,-6,1.05); silo(12,-6,.85); silo(10,-3.7,.85);
+
+  // Loading depot.
+  const depot=new THREE.Group(); scene.add(depot); depot.position.set(9,0,2.8);
+  cube(depot,red,0,1,0,3.4,2,2.7);
+  const depotRoof=mesh(coneGeo,roofMat,depot,0,2.3,0,2.5,1.4,2.2); depotRoof.rotation.z=Math.PI/2;
+  cube(depot,white,0,.75,1.38,1.1,1.2,.1);
+  cube(depot,wood,0,.45,1.45,.55,.6,.08);
+
+  // Trees along the outer edge.
+  const trunkMat=mat('#8a5b38'), leaf1=mat('#3e9c4d'), leaf2=mat('#60b84e');
+  function tree(x,z,s=1){
+    mesh(new THREE.CylinderGeometry(.13,.19,1.15,5),trunkMat,scene,x,.55,z,s,s,s);
+    mesh(coneGeo,leaf1,scene,x,1.55,z,.85*s,1.35*s,.85*s);
+    mesh(coneGeo,leaf2,scene,x,2.15,z,.62*s,1.05*s,.62*s);
+  }
+  [[-14,-8],[-15,0],[-14,7],[14,-9],[15,-2],[14,7],[-9,-11],[3,-11]].forEach((p,i)=>tree(p[0],p[1],.8+(i%3)*.13));
+
+  // Chickens: simple stylized low-poly shapes with tiny animated hops.
+  const chickens=[];
+  const chickenGroup=new THREE.Group(); scene.add(chickenGroup);
+  function makeChicken(x,z){
+    const g=new THREE.Group(); chickenGroup.add(g); g.position.set(x,0,z);
+    mesh(sphereGeo,white,g,0,.42,0,.35,.31,.43);
+    mesh(sphereGeo,white,g,0,.67,.26,.23,.22,.23);
+    mesh(sphereGeo,combMat,g,0,.89,.25,.09,.12,.09);
+    mesh(coneGeo,beakMat,g,0,.64,.49,.10,.14,.10).rotation.x=Math.PI/2;
+    mesh(sphereGeo,dark,g,-.09,.71,.43,.035,.04,.035);
+    mesh(sphereGeo,dark,g,.09,.71,.43,.035,.04,.035);
+    mesh(sphereGeo,combMat,g,.31,.42,-.04,.16,.08,.10);
+    mesh(boxGeo,beakMat,g,-.12,.17,.03,.07,.23,.07);
+    mesh(boxGeo,beakMat,g,.12,.17,.03,.07,.23,.07);
+    chickens.push({g,phase:Math.random()*6,baseX:x,baseZ:z});
+    return g;
+  }
+  const chickenSpots=[[-3,2],[-1,1],[1,2],[-4,4],[-1,4],[2,4],[-5,6],[-2,6],[1,6],[4,3],[4,5]];
+  chickenSpots.forEach((p,i)=>makeChicken(p[0],p[1]));
+
+  // Delivery truck on the service lane.
+  const truck=new THREE.Group(); scene.add(truck);
+  cube(truck,red,0,.55,0,1.65,.7,1.1);
+  cube(truck,white,.48,.85,0,.72,.62,.98);
+  cube(truck,windowMat,.5,.93,.51,.48,.32,.04);
+  for(const x of [-.52,.52]) for(const z of [-.38,.38])
+    mesh(new THREE.CylinderGeometry(.17,.17,.12,8),wheelMat,truck,x,.22,z,1,1,1).rotation.z=Math.PI/2;
+  truck.position.set(7,.05,4.5);
+
+  // Tiny egg piles beside the loading building.
+  const eggs=[];
+  for(let i=0;i<7;i++){
+    const e=mesh(sphereGeo,eggMat,scene,8.2+(i%4)*.28,.17,4.2+Math.floor(i/4)*.3,.12,.17,.12);
+    eggs.push(e);
+  }
+
+  const state={cash:50,chickens:chickenSpots.length,eggs:0,eggValue:1,coopLevel:0,feedLevel:0,truckLevel:1,lastTime:performance.now(),bonus:0};
+  const el=id=>document.getElementById(id);
+  const money=n=>'$'+Math.floor(n).toLocaleString('en-US');
+  const costs=()=>({hatch:Math.floor(10*Math.pow(1.18,state.chickens/4)),coop:Math.floor(80*Math.pow(1.8,state.coopLevel)),feed:Math.floor(120*Math.pow(1.75,state.feedLevel)),truck:Math.floor(180*Math.pow(2,state.truckLevel-1))});
+  function toast(message){const t=el('toast');t.textContent=message;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),1500);}
+  function addChicken(){
+    const c=costs();
+    if(state.cash<c.hatch){toast('Not enough cash yet!');return;}
+    state.cash-=c.hatch;
+    const count=1+state.coopLevel;
+    for(let i=0;i<count;i++){
+      const idx=state.chickens++;
+      const p=chickenSpots[idx%chickenSpots.length];
+      const row=Math.floor(idx/chickenSpots.length);
+      makeChicken(p[0]+((row%3)-1)*.42,p[1]+row*.38);
+    }
+    toast('Cluck! New chickens joined the farm.');
+    updateUI();
+  }
+  el('hatchBtn').addEventListener('click',addChicken);
+  el('collectBtn').addEventListener('click',()=>{
+    const reward=Math.max(5,Math.floor(state.eggs*state.eggValue*.35)+5);
+    state.cash+=reward; state.eggs=0; toast('Egg bonus sold for '+money(reward)+'!'); updateUI();
+  });
+  el('coopBtn').addEventListener('click',()=>{
+    const c=costs().coop;if(state.cash<c)return toast('Not enough cash yet!');
+    state.cash-=c;state.coopLevel++;toast('Bigger coop unlocked!');updateUI();
+  });
+  el('feedBtn').addEventListener('click',()=>{
+    const c=costs().feed;if(state.cash<c)return toast('Not enough cash yet!');
+    state.cash-=c;state.feedLevel++;state.eggValue*=1.55;toast('Eggs are worth more now!');updateUI();
+  });
+  el('truckBtn').addEventListener('click',()=>{
+    const c=costs().truck;if(state.cash<c)return toast('Not enough cash yet!');
+    state.cash-=c;state.truckLevel++;toast('Delivery fleet upgraded!');updateUI();
+  });
+
+  function updateUI(){
+    const c=costs();
+    el('cash').textContent=money(state.cash);
+    el('chickenCount').textContent=state.chickens;
+    el('rate').textContent=(state.chickens*(.5+.18*state.truckLevel)).toFixed(1);
+    el('truckLevel').textContent=state.truckLevel;
+    el('hatchBtn').textContent='+ Hatch chicken · '+money(c.hatch);
+    el('coopCost').textContent=money(c.coop);
+    el('feedCost').textContent=money(c.feed);
+    el('truckCost').textContent=money(c.truck);
+    el('coopBtn').disabled=state.cash<c.coop;
+    el('feedBtn').disabled=state.cash<c.feed;
+    el('truckBtn').disabled=state.cash<c.truck;
+  }
+  updateUI();
+
+  // The camera never rotates: only the little truck and chickens move.
+  function resize(){
+    const w=window.innerWidth,h=window.innerHeight;
+    const aspect=w/h, viewH=16.8, viewW=viewH*aspect;
+    camera.left=-viewW/2;camera.right=viewW/2;camera.top=viewH/2;camera.bottom=-viewH/2;
+    camera.updateProjectionMatrix();renderer.setSize(w,h);
+  }
+  window.addEventListener('resize',resize);resize();
+
+  let lastUI=0;
+  function animate(now){
+    requestAnimationFrame(animate);
+    const dt=Math.min((now-state.lastTime)/1000,.06);state.lastTime=now;
+    const rate=state.chickens*(.5+.18*state.truckLevel);
+    state.eggs+=rate*dt;
+    // Automated egg sales trickle cash in, even when the player does nothing.
+    state.cash+=rate*state.eggValue*dt*.32;
+    chickens.forEach((c,i)=>{
+      c.g.position.y=.025+Math.sin(now*.0025+c.phase)*.035;
+      c.g.rotation.y=Math.sin(now*.0007+c.phase)*.18;
+      c.g.position.x=c.baseX+Math.sin(now*.00045+c.phase)*.11;
+      c.g.position.z=c.baseZ+Math.cos(now*.0005+c.phase)*.09;
+    });
+    truck.position.x=7+Math.sin(now*.00025)*2.0;
+    truck.rotation.y=Math.sin(now*.00025)*.04;
+    eggs.forEach((e,i)=>{e.position.y=.17+Math.sin(now*.002+i)*.025;});
+    if(now-lastUI>250){updateUI();lastUI=now;}
+    renderer.render(scene,camera);
+  }
+  requestAnimationFrame(animate);
+}
+</script>
+</body>
+</html>
