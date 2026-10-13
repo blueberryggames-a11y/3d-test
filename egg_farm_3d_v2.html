@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Egg Farm 3D — Idle Farm</title>
+<style>
+:root{--ink:#24372a;--cream:#fff9e9;--green:#328a43;--gold:#f4c44a;--line:#d9e5d0}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#bfe7ff;color:var(--ink)}
+#game{position:fixed;inset:0}canvas{display:block;width:100%;height:100%;touch-action:manipulation}
+.hud{position:fixed;z-index:3;inset:0;padding:10px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;pointer-events:none}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.brand,.money,.pill,.panel,.modal{background:rgba(255,249,233,.96);border:2px solid rgba(42,83,49,.16);box-shadow:0 4px 0 rgba(42,83,49,.12);border-radius:15px}
+.brand{padding:8px 12px;font-weight:950;letter-spacing:.04em;font-size:13px}.money{padding:7px 12px;text-align:right;min-width:110px}.money small{display:block;font-size:9px;text-transform:uppercase;font-weight:900;opacity:.65}.money strong{font-size:21px;color:#247b3a}
+.metrics{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.pill{padding:6px 9px;font-size:11px;font-weight:850}
+.bottom{display:grid;grid-template-columns:1.05fr 1fr;gap:8px;align-items:end}.panel{padding:9px;min-width:0;pointer-events:auto}.panel h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin:0 0 6px}.sub{font-size:10px;opacity:.7;margin:0 0 7px}
+button{border:0;border-radius:11px;padding:9px 8px;font:inherit;font-size:11px;font-weight:900;background:#f4c44a;color:#24372a;box-shadow:0 3px 0 #d4a02c;cursor:pointer;touch-action:manipulation}
+button:active{transform:translateY(2px);box-shadow:0 1px 0 #d4a02c}button:disabled{opacity:.4;filter:grayscale(.5)}
+.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:6px}.btnstack{display:grid;gap:6px}
+.green{background:#dff1d0;box-shadow:0 3px 0 #b5d19b}.blue{background:#dceeff;box-shadow:0 3px 0 #b3d0e7}
+.upgradebtn{text-align:left;display:flex;justify-content:space-between;gap:5px;align-items:center;width:100%;padding:8px}.upgradebtn span{min-width:0}.upgradebtn b{display:block;font-size:10px}.upgradebtn small{display:block;font-size:9px;font-weight:700;opacity:.7}.upgradebtn em{font-style:normal;white-space:nowrap;font-size:10px}
+#selectedInfo{font-size:10px;line-height:1.4;margin:0 0 7px;min-height:27px}
+#toast{position:fixed;z-index:10;top:22%;left:50%;transform:translate(-50%,-8px);background:#24372a;color:white;padding:9px 13px;border-radius:99px;font-size:12px;font-weight:850;opacity:0;transition:.2s;pointer-events:none;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#hint{position:fixed;z-index:2;top:76px;left:50%;transform:translateX(-50%);background:#ffffffd9;padding:5px 10px;border-radius:99px;font-size:10px;font-weight:850;white-space:nowrap;pointer-events:none}
+.modalwrap{position:fixed;z-index:8;inset:0;background:#17301d55;display:none;align-items:center;justify-content:center;padding:18px;pointer-events:auto}.modalwrap.open{display:flex}.modal{width:min(390px,100%);padding:15px}.modalhead{display:flex;justify-content:space-between;align-items:center;gap:8px}.modal h2{font-size:17px;margin:0}.close{padding:6px 10px;background:#e8e8df;box-shadow:none}.modal p{font-size:12px;line-height:1.45;margin:8px 0}.modalgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.modalgrid button{text-align:left}.modalgrid button span{display:block;font-size:10px;font-weight:700;opacity:.7;margin-top:3px}
+@media(max-width:520px){.hud{padding:7px;gap:5px}.brand{font-size:11px;padding:7px 9px}.money{min-width:93px;padding:6px 9px}.money strong{font-size:18px}.pill{font-size:10px;padding:5px 7px}.bottom{gap:5px}.panel{padding:7px;border-radius:12px}.panel h3{font-size:10px}.sub{font-size:9px;margin-bottom:5px}button{font-size:10px;padding:8px 6px}.upgradebtn{padding:7px 6px}.upgradebtn b{font-size:9px}.upgradebtn small{font-size:8px}.upgradebtn em{font-size:9px}#hint{top:62px;font-size:9px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div class="hud">
+ <div class="top"><div class="brand">🥚 EGG FARM <span style="color:#3b984d">TYCOON</span></div><div class="money"><small>Farm cash</small><strong id="cash">$150</strong></div></div>
+ <div class="metrics">
+  <div class="pill">🐔 Chickens <span id="chickens">12</span></div><div class="pill">🥚 Eggs in storage <span id="eggs">0 / 250</span></div><div class="pill">📦 Shipping <span id="shipRate">100</span>/trip</div>
+ </div>
+ <div class="bottom">
+  <section class="panel">
+   <h3 id="selectedTitle">Pen 1 · Simple Pen</h3>
+   <p id="selectedInfo">Tap a pen in the farm to manage it.</p>
+   <div class="btnstack">
+    <button id="penUpgrade" class="green">Upgrade selected pen</button>
+    <button id="hatchUpgrade" class="blue">Upgrade hatchery</button>
+   </div>
+  </section>
+  <section class="panel">
+   <h3>Farm research</h3>
+   <div class="btnstack">
+    <button id="eggUpgrade" class="upgradebtn"><span><b>🥚 Better egg value</b><small id="eggDesc">Earn more per egg</small></span><em id="eggCost">$75</em></button>
+    <button id="layUpgrade" class="upgradebtn"><span><b>⚡ Faster laying</b><small id="layDesc">More eggs per chicken</small></span><em id="layCost">$90</em></button>
+    <button id="truckUpgrade" class="upgradebtn"><span><b>🚚 Upgrade delivery</b><small id="truckDesc">Car · 100 eggs/trip</small></span><em id="truckCost">$100</em></button>
+   </div>
+  </section>
+ </div>
+</div>
+<div id="hint">Tap a pen, hatchery, or delivery depot to upgrade it</div>
+<div id="toast"></div>
+<div id="modalwrap" class="modalwrap"><div class="modal"><div class="modalhead"><h2 id="modalTitle">Building</h2><button class="close" id="closeModal">✕</button></div><p id="modalText"></p><div class="modalgrid" id="modalActions"></div></div></div>
+<script type="module">
+(async()=>{const hint=document.getElementById('hint');try{const THREE=await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js');startGame(THREE)}catch(e){hint.textContent='3D engine did not load. Check internet and open from GitHub Pages.';hint.style.whiteSpace='normal';hint.style.maxWidth='90%';console.error(e)}})();
+
+function startGame(THREE){
+const root=document.getElementById('game'),scene=new THREE.Scene();scene.background=new THREE.Color('#bfe7ff');scene.fog=new THREE.Fog('#bfe7ff',35,80);
+const camera=new THREE.OrthographicCamera(-15,15,10,-10,.1,100);camera.position.set(17,21,23);camera.lookAt(0,0,0);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x6b9b60,2));const sun=new THREE.DirectionalLight(0xffffff,2.1);sun.position.set(-10,20,13);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-25;sun.shadow.camera.right=25;sun.shadow.camera.top=25;sun.shadow.camera.bottom=-25;scene.add(sun);
+const M=c=>new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:1});
+const mats={grass:M('#76c85b'),grass2:M('#5bb24f'),road:M('#d9c59c'),white:M('#fff9e9'),red:M('#d95345'),yellow:M('#edc24b'),wood:M('#a86c40'),brown:M('#8b5836'),dark:M('#344039'),gray:M('#d5dfe1'),blue:M('#a8e1f2'),egg:M('#fff0ca'),orange:M('#f4a52f'),green:M('#36964c'),leaf:M('#459e4d'),leaf2:M('#62b94f'),wheel:M('#2f3837'),roof2:M('#c58b45')};
+const box=new THREE.BoxGeometry(1,1,1),sphere=new THREE.SphereGeometry(1,8,6),cone=new THREE.ConeGeometry(1,1,5);
+function mesh(g,m,p=scene,x=0,y=0,z=0,sx=1,sy=1,sz=1){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;o.receiveShadow=true;p.add(o);return o}
+function cube(p,m,x,y,z,sx,sy,sz){return mesh(box,m,p,x,y,z,sx,sy,sz)}
+// Farm ground, roads, and border.
+cube(scene,mats.grass,0,-.4,0,36,.65,28);cube(scene,mats.road,0,-.015,4.8,32,.08,2.1);cube(scene,mats.road,7,-.01,-1,2,.08,12);
+for(let i=0;i<9;i++)cube(scene,mats.white,7,.04,-6+i*1.4,.1,.025,.6);
+for(let i=0;i<34;i++){const x=((i*17)%33)-16,z=((i*11)%25)-12;if(Math.abs(x)<7&&z>-7&&z<8)continue;mesh(cone,mats.grass2,scene,x,-.01,z,.08,.03,.08).rotation.x=Math.PI}
+for(let x=-15;x<=15;x+=1.3){cube(scene,mats.white,x,.35,10.5,.1,.7,.1);if(Math.round(x)%2===0)cube(scene,mats.wood,x,.42,10.5,.16,.12,.16)}
+cube(scene,mats.white,0,.18,10.5,30,.1,.1);cube(scene,mats.white,0,.52,10.5,30,.1,.1);
+function tree(x,z,s=1){mesh(new THREE.CylinderGeometry(.12,.18,1,5),mats.brown,scene,x,.5,z,.8*s,s,.8*s);mesh(cone,mats.leaf,scene,x,1.45,z,.8*s,1.2*s,.8*s);mesh(cone,mats.leaf2,scene,x,2.05,z,.58*s,.9*s,.58*s)}
+[[-15,-8],[-15,0],[-15,7],[15,-8],[15,-1],[15,7],[-10,-12],[2,-12]].forEach((p,i)=>tree(...p,.85+(i%3)*.12));
+// Four independently clickable habitats.
+const penPositions=[[-7,1],[-1,1],[-7,-5],[-1,-5]],pens=[];
+const penNames=['Simple Pen','Big Pen','Shack','Super Shack','House','Big House','Barn','Mega Barn','Grand Coop','Elite Habitat'];
+const penCosts=[45,95,180,320,600,1100,2100,3900,7200,13000];
+function buildPen(pen){
+ if(pen.group)scene.remove(pen.group);
+ const g=new THREE.Group();scene.add(g);g.position.set(pen.x,0,pen.z);pen.group=g;
+ const lvl=pen.level,stage=Math.min(9,Math.floor((lvl-1)/1)),size=1+Math.floor((lvl-1)/3)*.22;
+ const width=2.8+Math.min(3,Math.floor((lvl-1)/3))*.65,depth=2.25+Math.min(3,Math.floor((lvl-1)/3))*.35;
+ const walls=stage<2?mats.wood:stage<4?mats.yellow:stage<6?mats.white:stage<8?mats.roof2:mats.gray;
+ cube(g,walls,0,.62,0,width,1.2,depth);
+ const roofMat=stage<2?mats.yellow:stage<4?mats.red:stage<6?mats.roof2:stage<8?mats.red:mats.gray;
+ const r=mesh(cone,roofMat,g,0,1.55,0,width*.72,1.05,depth*.8);r.rotation.z=Math.PI/2;
+ cube(g,mats.dark,0,.35,depth/2+.015,.7,.65,.07);
+ cube(g,mats.blue,-width*.27,.85,depth/2+.04,.42,.38,.04);cube(g,mats.blue,width*.27,.85,depth/2+.04,.42,.38,.04);
+ // Small fenced yard attached to the building.
+ for(let xx=-width*.65;xx<=width*.65+.01;xx+=.55){cube(g,mats.white,xx,.2,depth*.78,.07,.4,.07)}
+ cube(g,mats.white,0,.14,depth*.78,width*1.35,.07,.07);
+ // label board in farm-world uses a colored slab; exact labels are in UI.
+ const sign=cube(g,mats.white,0,2.15,0,1.15,.3,.1);sign.rotation.x=-.2;
+ pen.pickables=[...g.children];pen.capacity=pen.level*35+15;
+}
+for(let i=0;i<4;i++){const [x,z]=penPositions[i],p={id:i+1,x,z,level:1,chickens:i===0?12:0,group:null,pickables:[]};pens.push(p);buildPen(p)}
+// Hatchery building and delivery depot.
+const hatch=new THREE.Group();scene.add(hatch);hatch.position.set(-11,0,-5);
+cube(hatch,mats.white,0,.65,0,2.6,1.3,2);const hr=mesh(cone,mats.yellow,hatch,0,1.45,0,1.9,1,1.5);hr.rotation.z=Math.PI/2;cube(hatch,mats.red,0,.35,1.03,.7,.7,.08);
+const depot=new THREE.Group();scene.add(depot);depot.position.set(10,0,0);
+cube(depot,mats.red,0,.8,0,3,1.6,2.3);const dr=mesh(cone,mats.yellow,depot,0,1.8,0,2.2,1.2,1.8);dr.rotation.z=Math.PI/2;cube(depot,mats.white,0,.65,1.18,1,.95,.08);
+const silo=new THREE.Group();scene.add(silo);silo.position.set(11,0,-5);mesh(new THREE.CylinderGeometry(.7,.8,2.5,8),mats.gray,silo,0,1.25,0);mesh(new THREE.ConeGeometry(.78,.65,8),mats.white,silo,0,2.82,0);
+// Chickens, eggs and trucks.
+const chickenGroup=new THREE.Group();scene.add(chickenGroup);const chickenModels=[];
+function addChicken(pen){const g=new THREE.Group();chickenGroup.add(g);const n=pen.chickens-1;g.position.set(pen.x+(Math.random()-.5)*2,0,pen.z+(Math.random()-.5)*1.35);
+mesh(sphere,mats.white,g,0,.35,0,.27,.24,.34);mesh(sphere,mats.white,g,0,.55,.19,.17,.17,.18);mesh(sphere,mats.red,g,0,.72,.2,.07,.08,.07);mesh(cone,mats.orange,g,0,.53,.38,.07,.1,.07).rotation.x=Math.PI/2;mesh(sphere,mats.dark,g,-.065,.57,.34,.025,.03,.025);mesh(sphere,mats.dark,g,.065,.57,.34,.025,.03,.025);mesh(box,mats.orange,g,-.08,.13,0,.045,.17,.05);mesh(box,mats.orange,g,.08,.13,0,.045,.17,.05);
+chickenModels.push({g,phase:Math.random()*8,pen});}
+for(const p of pens)for(let i=0;i<p.chickens;i++)addChicken(p);
+function makeTruck(type,capacity,color){
+ const g=new THREE.Group();scene.add(g);cube(g,color,0,.45,0,1.45,.55,.85);cube(g,mats.white,.48,.72,0,.68,.55,.8);cube(g,mats.blue,.5,.78,.42,.43,.28,.04);
+ for(const x of [-.45,.48])for(const z of [-.32,.32])mesh(new THREE.CylinderGeometry(.14,.14,.1,8),mats.wheel,g,x,.18,z).rotation.z=Math.PI/2;
+ return {g,type,capacity,color,progress:0,active:false,load:0};
+}
+const vehicles=[makeTruck('Car',100,mats.white)];vehicles[0].g.position.set(7,.04,4.8);
+const eggMeshes=[];for(let i=0;i<12;i++)eggMeshes.push(mesh(sphere,mats.egg,scene,9+(i%4)*.25,.16,2.7+Math.floor(i/4)*.24,.1,.14,.1));
+const state={cash:150,eggs:0,eggValue:1,layRate:.35,hatchRate:.4,hatchLevel:1,eggLevel:0,layLevel:0,truckLevel:0,totalChickens:12,selected:1,last:performance.now(),saleTotal:0};
+const $=id=>document.getElementById(id), money=n=>'$'+Math.floor(n).toLocaleString('en-US');
+let selectedPen=1, toastTimer;
+function toast(s){$('toast').textContent=s;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),1550)}
+function currentPen(){return pens[selectedPen-1]}
+function penCap(p){return p.level*35+15}
+function totalCapacity(){return pens.reduce((a,p)=>a+penCap(p),0)}
+function vehicleCapacity(){return vehicles.reduce((a,v)=>a+v.capacity,0)}
+function eggCap(){return 250+state.truckLevel*250}
+function stageName(level){return penNames[Math.min(9,Math.floor((level-1)/1))]}
+function nextPenCost(p){return Math.floor(penCosts[Math.min(9,p.level-1)]*Math.pow(1.85,p.level-1))}
+function hatchCost(){return Math.floor(100*Math.pow(1.75,state.hatchLevel-1))}
+function eggCost(){return Math.floor(75*Math.pow(1.8,state.eggLevel))}
+function layCost(){return Math.floor(90*Math.pow(1.75,state.layLevel))}
+function truckCost(){return Math.floor(100*Math.pow(2.0,state.truckLevel))}
+function openModal(title,text,actions){$('modalTitle').textContent=title;$('modalText').textContent=text;const wrap=$('modalActions');wrap.innerHTML='';for(const a of actions){const b=document.createElement('button');b.textContent=a.label;const sp=document.createElement('span');sp.textContent=a.sub||'';b.appendChild(sp);b.disabled=!!a.disabled;b.onclick=()=>{a.run();$('modalwrap').classList.remove('open')};wrap.appendChild(b)}$('modalwrap').classList.add('open')}
+$('closeModal').onclick=()=>$('modalwrap').classList.remove('open');
+function selectPen(id){selectedPen=id;const p=currentPen();$('selectedTitle').textContent='Pen '+p.id+' · '+stageName(p.level);$('selectedInfo').textContent='Level '+p.level+'/10 · '+p.chickens+' chickens · '+penCap(p)+' chicken capacity. Tap upgrade to improve its size and hatchery output.';updateUI()}
+function upgradePen(p){const cost=nextPenCost(p);if(p.level>=10){toast('This pen is fully upgraded!');return}if(state.cash<cost){toast('Not enough cash yet!');return}state.cash-=cost;p.level++;buildPen(p);toast('Pen '+p.id+' upgraded to '+stageName(p.level)+'!');selectPen(p.id)}
+function upgradeHatch(){const cost=hatchCost();if(state.cash<cost)return toast('Not enough cash yet!');state.cash-=cost;state.hatchLevel++;state.hatchRate*=1.42;toast('Hatchery speed increased!');updateUI()}
+$('penUpgrade').onclick=()=>upgradePen(currentPen());$('hatchUpgrade').onclick=upgradeHatch;
+$('eggUpgrade').onclick=()=>{const c=eggCost();if(state.cash<c)return toast('Not enough cash yet!');state.cash-=c;state.eggLevel++;state.eggValue*=1.65;toast('Egg value increased!');updateUI()};
+$('layUpgrade').onclick=()=>{const c=layCost();if(state.cash<c)return toast('Not enough cash yet!');state.cash-=c;state.layLevel++;state.layRate*=1.3;toast('Egg laying speed increased!');updateUI()};
+$('truckUpgrade').onclick=()=>{const c=truckCost();if(state.cash<c)return toast('Not enough cash yet!');state.cash-=c;state.truckLevel++;let v;if(state.truckLevel===1)v=makeTruck('Van',300,mats.blue);else if(state.truckLevel===2)v=makeTruck('Truck',1000,mats.red);else if(state.truckLevel===3)v=makeTruck('Big Truck',5000,mats.yellow);else v=makeTruck('Mega Truck',Math.min(100000,5000*Math.pow(3,state.truckLevel-3)),mats.green);vehicles.push(v);toast(v.type+' added to delivery fleet!');updateUI()};
+function updateUI(){
+ const p=currentPen(),pc=nextPenCost(p),hc=hatchCost(),ec=eggCost(),lc=layCost(),tc=truckCost();
+ $('cash').textContent=money(state.cash);$('chickens').textContent=state.totalChickens;
+ $('eggs').textContent=Math.floor(state.eggs).toLocaleString()+' / '+eggCap().toLocaleString();
+ $('shipRate').textContent=vehicleCapacity().toLocaleString();
+ $('selectedTitle').textContent='Pen '+p.id+' · '+stageName(p.level);
+ $('selectedInfo').textContent='Level '+p.level+'/10 · '+p.chickens+' chickens · '+penCap(p)+' capacity.';
+ $('penUpgrade').textContent=p.level>=10?'Pen fully upgraded':`Upgrade pen · ${money(pc)}`;
+ $('penUpgrade').disabled=p.level>=10||state.cash<pc;
+ $('hatchUpgrade').textContent=`Hatchery Lv.${state.hatchLevel} · ${money(hc)}`;
+ $('eggCost').textContent=money(ec);$('layCost').textContent=money(lc);$('truckCost').textContent=money(tc);
+ $('eggDesc').textContent='Value '+money(state.eggValue)+' per egg';$('layDesc').textContent=state.layRate.toFixed(2)+' eggs/chicken/sec';
+ const nextVehicle=state.truckLevel===0?'Next: Van · 300 eggs/trip':state.truckLevel===1?'Next: Truck · 1,000 eggs/trip':state.truckLevel===2?'Next: Big truck · 5,000 eggs/trip':state.truckLevel===3?'Next: Mega truck · 15,000 eggs/trip':'Next: Mega fleet upgrade';
+ $('truckDesc').textContent=nextVehicle;
+ for(const id of ['eggUpgrade','layUpgrade','truckUpgrade'])$(id).disabled=state.cash<({eggUpgrade:ec,layUpgrade:lc,truckUpgrade:tc}[id]);
+ $('hatchUpgrade').disabled=state.cash<hc;
+}
+function clickBuilding(type,id){
+ if(type==='pen'){selectPen(id);const p=pens[id-1],cost=nextPenCost(p);openModal('Pen '+id+' · '+stageName(p.level),`Level ${p.level}/10. Capacity: ${penCap(p)} chickens. This pen currently has ${p.chickens} chickens.`,[
+ {label:p.level>=10?'MAX LEVEL':'Upgrade · '+money(cost),sub:'More space and a better building',disabled:p.level>=10||state.cash<cost,run:()=>upgradePen(p)},
+ {label:'Hatchery · '+money(hatchCost()),sub:'Increase automatic chicken growth',disabled:state.cash<hatchCost(),run:upgradeHatch}
+ ]);}
+ if(type==='hatch')openModal('Chicken Hatchery',`The hatchery automatically adds ${state.hatchRate.toFixed(2)} chickens per second to your available pen space. Level ${state.hatchLevel}.`,[
+ {label:'Upgrade · '+money(hatchCost()),sub:'Faster automatic hatching',disabled:state.cash<hatchCost(),run:upgradeHatch},
+ {label:'Egg value · '+money(eggCost()),sub:'Earn more for each delivered egg',disabled:state.cash<eggCost(),run:()=> $('eggUpgrade').click()}
+ ]);
+ if(type==='depot')openModal('Delivery Depot',`Vehicles collect stored eggs when they arrive. Your current fleet capacity is ${vehicleCapacity().toLocaleString()} eggs per trip. Eggs that cannot fit in storage pause production.`,[
+ {label:'Upgrade fleet · '+money(truckCost()),sub:'Add the next delivery vehicle',disabled:state.cash<truckCost(),run:()=> $('truckUpgrade').click()},
+ {label:'Laying speed · '+money(layCost()),sub:'Produce eggs faster',disabled:state.cash<layCost(),run:()=> $('layUpgrade').click()}
+ ]);
+}
+const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown',e=>{const r=renderer.domElement.getBoundingClientRect();pointer.x=(e.clientX-r.left)/r.width*2-1;pointer.y=-(e.clientY-r.top)/r.height*2+1;raycaster.setFromCamera(pointer,camera);const objs=[];pens.forEach(p=>p.pickables.forEach(o=>objs.push({o,type:'pen',id:p.id})));hatch.children.forEach(o=>objs.push({o,type:'hatch'}));depot.children.forEach(o=>objs.push({o,type:'depot'}));const hits=raycaster.intersectObjects(objs.map(x=>x.o),false);if(hits.length){const found=objs.find(x=>x.o===hits[0].object);if(found)clickBuilding(found.type,found.id||1)}});
+// Truck visits follow the road to the depot, pause to load, then drive off-screen and return.
+function startTrip(v){v.active=true;v.progress=0;v.load=Math.min(Math.floor(state.eggs),v.capacity);state.eggs-=v.load;state.saleTotal+=v.load;state.cash+=v.load*state.eggValue;toast(v.type+' collected '+v.load.toLocaleString()+' eggs!')}
+function resize(){const w=innerWidth,h=innerHeight,aspect=w/h,vh=19;camera.left=-vh*aspect/2;camera.right=vh*aspect/2;camera.top=vh/2;camera.bottom=-vh/2;camera.updateProjectionMatrix();renderer.setSize(w,h)}
+window.addEventListener('resize',resize);resize();updateUI();
+let lastUI=0;
+function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-state.last)/1000,.05);state.last=now;
+ // Hatchery makes new chickens over time, subject to four pen capacities.
+ let room=0;for(const p of pens)room+=Math.max(0,penCap(p)-p.chickens);
+ let newChickens=Math.min(room,state.hatchRate*dt);state.hatchFraction=(state.hatchFraction||0)+newChickens;
+ while(state.hatchFraction>=1){let target=pens.find(p=>p.chickens<penCap(p));if(!target){state.hatchFraction=0;break}target.chickens++;state.totalChickens++;addChicken(target);state.hatchFraction-=1}
+ const production=state.totalChickens*state.layRate;
+ const free=Math.max(0,eggCap()-state.eggs);const made=Math.min(free,production*dt);state.eggs+=made;
+ // Dispatch each vehicle on a regular route; vehicles are limited by their own egg capacity.
+ vehicles.forEach((v,i)=>{if(!v.active){v.progress+=dt;if(v.progress>Math.max(10,18-i*1.5)&&state.eggs>=1)startTrip(v)}else{v.progress+=dt;const t=Math.min(1,v.progress/4);v.g.position.x=7+(10-7)*t;v.g.position.z=4.8+(1-4.8)*t;if(v.progress>=4){v.active=false;v.progress=0;v.g.position.set(7,.04,4.8+i*.55)}}});
+ chickenModels.forEach(c=>{c.g.position.y=.02+Math.sin(now*.003+c.phase)*.025;c.g.rotation.y=Math.sin(now*.0006+c.phase)*.12});
+ eggMeshes.forEach((e,i)=>{e.position.y=.16+Math.sin(now*.002+i)*.025;e.visible=state.eggs>i*5});
+ if(now-lastUI>250){updateUI();lastUI=now}renderer.render(scene,camera)}
+requestAnimationFrame(animate);
+}
+</script>
+</body>
+</html>
