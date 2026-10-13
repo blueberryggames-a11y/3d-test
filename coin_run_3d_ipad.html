@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Low Poly Coin Run 3D</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:system-ui,Arial;background:#bdeaf4;touch-action:manipulation}
+canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;z-index:2}
+.panel{background:#ffffffeb;color:#214638;border-radius:13px;padding:10px 13px;font-weight:800;box-shadow:0 4px 16px #0002;font-size:14px}
+#overlay{position:fixed;inset:0;display:grid;place-items:center;background:#183a3444;padding:18px;z-index:5}
+#card{background:#fffdf5;color:#214638;border-radius:22px;padding:26px 22px;text-align:center;width:min(390px,100%);box-shadow:0 18px 50px #0003}
+h1{margin:0 0 8px;font-size:30px}p{line-height:1.5}
+button{border:0;border-radius:14px;background:#ffc83d;color:#3a2b05;font-weight:850;font-size:17px;padding:14px 22px;cursor:pointer;touch-action:manipulation}
+#status{font-size:13px;color:#7b4d26;min-height:18px}
+#controls{position:fixed;bottom:18px;left:0;right:0;display:flex;justify-content:space-between;padding:0 20px;z-index:3;pointer-events:none}
+#controls button{pointer-events:auto;background:#ffffffeb;border:2px solid white;width:62px;height:62px;border-radius:50%;padding:0;font-size:25px;box-shadow:0 4px 14px #0002}
+@media(min-width:800px){#controls{display:none}}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="panel">COINS: <span id="score">0</span></div>
+  <div class="panel">← → MOVE · SPACE JUMP</div>
+</div>
+<div id="overlay">
+  <div id="card">
+    <h1 id="title">COIN RUN 3D</h1>
+    <p id="message">A colorful low-poly 3D runner. Collect coins, dodge wooden blocks, and jump to survive!</p>
+    <button id="start">START GAME</button>
+    <p id="status">Loading 3D engine…</p>
+  </div>
+</div>
+<div id="controls">
+  <button id="left" aria-label="Move left">←</button>
+  <button id="jump" aria-label="Jump">↑</button>
+  <button id="right" aria-label="Move right">→</button>
+</div>
+
+<script type="module">
+const overlay=document.getElementById('overlay');
+const statusEl=document.getElementById('status');
+const startBtn=document.getElementById('start');
+let gameReady=false;
+let startGame=()=>{};
+
+function showError(message){
+  overlay.style.display='grid';
+  document.getElementById('title').textContent='3D GAME COULD NOT LOAD';
+  document.getElementById('message').textContent=message;
+  statusEl.textContent='Check that you have internet, then refresh this page.';
+  startBtn.textContent='REFRESH';
+  startBtn.onclick=()=>location.reload();
+}
+
+try {
+  // Direct module URL: no import map required.
+  const THREE = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js');
+
+  const scene=new THREE.Scene();
+  scene.background=new THREE.Color('#bdeaf4');
+  scene.fog=new THREE.Fog('#bdeaf4',28,95);
+
+  const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,180);
+  camera.position.set(0,6.5,10.5);
+
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.7));
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+  document.body.insertBefore(renderer.domElement,document.getElementById('hud'));
+
+  scene.add(new THREE.HemisphereLight(0xffffff,0x62885b,2));
+  const sun=new THREE.DirectionalLight(0xffffff,2.2);
+  sun.position.set(-7,13,8);
+  sun.castShadow=true;
+  sun.shadow.mapSize.set(1024,1024);
+  scene.add(sun);
+
+  const mat=c=>new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:.9});
+  const grass=mat('#75c967'), asphalt=mat('#697a82'), wood=mat('#956039');
+  const gold=new THREE.MeshStandardMaterial({color:'#ffca2c',metalness:.3,roughness:.3,flatShading:true});
+
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(150,200),grass);
+  floor.rotation.x=-Math.PI/2;floor.position.set(0,-.17,-65);floor.receiveShadow=true;scene.add(floor);
+  const road=new THREE.Mesh(new THREE.BoxGeometry(8,.22,190),asphalt);
+  road.position.set(0,-.04,-65);road.receiveShadow=true;scene.add(road);
+
+  for(let z=12;z>-155;z-=5){
+    const dash=new THREE.Mesh(new THREE.BoxGeometry(.12,.025,2.1),mat('#fff4d7'));
+    dash.position.set(0,.085,z);scene.add(dash);
+  }
+
+  function tree(x,z,s=1){
+    const g=new THREE.Group();
+    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.14,.22,1.15,5),wood);
+    trunk.position.y=.58;g.add(trunk);
+    const lower=new THREE.Mesh(new THREE.ConeGeometry(.83,1.55,5),mat('#278b52'));
+    lower.position.y=1.55;g.add(lower);
+    const upper=new THREE.Mesh(new THREE.ConeGeometry(.55,1.15,5),mat('#45ad61'));
+    upper.position.y=2.2;g.add(upper);
+    g.position.set(x,0,z);g.scale.setScalar(s);
+    g.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+    scene.add(g);
+  }
+  for(let z=10;z>-150;z-=7){
+    tree(-6.7-Math.random()*1.8,z,.8+Math.random()*.4);
+    tree(6.7+Math.random()*1.8,z-3,.8+Math.random()*.4);
+  }
+
+  const player=new THREE.Group();
+  function addPlayerPart(geometry,color,x,y,z){
+    const m=new THREE.Mesh(geometry,mat(color));m.position.set(x,y,z);m.castShadow=true;player.add(m);
+  }
+  addPlayerPart(new THREE.BoxGeometry(.78,1,.58),'#f47d52',0,.85,0);
+  addPlayerPart(new THREE.IcosahedronGeometry(.38,0),'#ffd1a3',0,1.58,0);
+  addPlayerPart(new THREE.BoxGeometry(.7,.2,.6),'#39464d',0,1.88,0);
+  for(const x of [-.22,.22])addPlayerPart(new THREE.BoxGeometry(.22,.44,.28),'#365b9b',x,.22,0);
+  player.position.set(0,0,3);scene.add(player);
+
+  const lanes=[-2.3,0,2.3], objects=[];
+  let lane=1,score=0,speed=13,running=false,jumping=false,jumpV=0,spawn=0,last=performance.now();
+
+  function spawnObstacle(z){
+    const g=new THREE.Group();
+    const b=new THREE.Mesh(new THREE.BoxGeometry(1.15,1,.9),wood);b.position.y=.5;b.castShadow=true;g.add(b);
+    const stripe=new THREE.Mesh(new THREE.BoxGeometry(1.17,.12,.92),mat('#e9bb72'));stripe.position.y=.69;g.add(stripe);
+    g.position.set(lanes[Math.floor(Math.random()*3)],0,z);scene.add(g);objects.push({mesh:g,type:'obstacle'});
+  }
+  function spawnCoin(z,laneIndex){
+    const c=new THREE.Mesh(new THREE.CylinderGeometry(.36,.36,.13,12),gold);
+    c.rotation.x=Math.PI/2;c.position.set(lanes[laneIndex ?? Math.floor(Math.random()*3)],1.15,z);c.castShadow=true;
+    scene.add(c);objects.push({mesh:c,type:'coin'});
+  }
+  function moveLeft(){if(running)lane=Math.max(0,lane-1);}
+  function moveRight(){if(running)lane=Math.min(2,lane+1);}
+  function jump(){if(running&&!jumping){jumping=true;jumpV=9;}}
+  function reset(){
+    for(const o of objects)scene.remove(o.mesh);
+    objects.length=0;lane=1;score=0;speed=13;spawn=.5;jumping=false;jumpV=0;
+    player.position.set(0,0,3);document.getElementById('score').textContent='0';
+    document.getElementById('title').textContent='COIN RUN 3D';
+    document.getElementById('message').textContent='Collect coins and dodge the blocks!';
+    statusEl.textContent='';startBtn.textContent='START GAME';
+    overlay.style.display='none';running=true;last=performance.now();
+  }
+  function end(){
+    running=false;
+    document.getElementById('title').textContent='RUN OVER!';
+    document.getElementById('message').textContent=`You collected ${score} coins. Tap below to try again!`;
+    startBtn.textContent='PLAY AGAIN';overlay.style.display='grid';
+  }
+  startGame=reset;
+  startBtn.onclick=()=>startGame();
+  document.getElementById('left').addEventListener('pointerdown',e=>{e.preventDefault();moveLeft();});
+  document.getElementById('right').addEventListener('pointerdown',e=>{e.preventDefault();moveRight();});
+  document.getElementById('jump').addEventListener('pointerdown',e=>{e.preventDefault();jump();});
+  window.addEventListener('keydown',e=>{
+    if(['ArrowLeft','ArrowRight','ArrowUp',' '].includes(e.key))e.preventDefault();
+    if(e.key==='ArrowLeft'||e.key.toLowerCase()==='a')moveLeft();
+    if(e.key==='ArrowRight'||e.key.toLowerCase()==='d')moveRight();
+    if(e.key==='ArrowUp'||e.key===' '||e.key.toLowerCase()==='w')jump();
+    if(!running&&e.key==='Enter')reset();
+  });
+
+  function animate(now){
+    requestAnimationFrame(animate);
+    const dt=Math.min((now-last)/1000,.04);last=now;
+    if(running){
+      speed=Math.min(19,speed+dt*.1);
+      player.position.x=THREE.MathUtils.damp(player.position.x,lanes[lane],13,dt);
+      player.rotation.z=THREE.MathUtils.damp(player.rotation.z,(lanes[lane]-player.position.x)*-.08,9,dt);
+      if(jumping){
+        player.position.y+=jumpV*dt;jumpV-=22*dt;
+        if(player.position.y<=0){player.position.y=0;jumping=false;jumpV=0;}
+      }else player.position.y=Math.sin(now*.012)*.025;
+
+      spawn-=dt;
+      if(spawn<=0){
+        const obstacleLane=Math.floor(Math.random()*3);
+        if(Math.random()<.62)spawnObstacle(-52);
+        else spawnCoin(-52,obstacleLane);
+        if(Math.random()<.8)spawnCoin(-59,(obstacleLane+1+Math.floor(Math.random()*2))%3);
+        spawn=.95+Math.random()*.35;
+      }
+      for(let i=objects.length-1;i>=0;i--){
+        const o=objects[i];o.mesh.position.z+=speed*dt;
+        if(o.type==='coin')o.mesh.rotation.y+=dt*3;
+        const nearZ=Math.abs(o.mesh.position.z-player.position.z)<.78;
+        const nearX=Math.abs(o.mesh.position.x-player.position.x)<.92;
+        if(nearZ&&nearX){
+          if(o.type==='coin'){
+            score++;document.getElementById('score').textContent=score;
+            scene.remove(o.mesh);objects.splice(i,1);continue;
+          }else if(player.position.y<.62){end();break;}
+        }
+        if(o.mesh.position.z>12){scene.remove(o.mesh);objects.splice(i,1);}
+      }
+      camera.position.x=THREE.MathUtils.damp(camera.position.x,player.position.x*.23,2.5,dt);
+      camera.lookAt(player.position.x*.12,1,-5);
+    }
+    renderer.render(scene,camera);
+  }
+  window.addEventListener('resize',()=>{
+    camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+  gameReady=true;statusEl.textContent='3D engine ready — tap Start Game!';
+  requestAnimationFrame(animate);
+} catch(error) {
+  console.error(error);
+  showError('The browser could not download or start the 3D engine. Open this page from a website such as GitHub Pages and check your internet connection.');
+}
+</script>
+</body>
+</html>
